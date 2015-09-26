@@ -1,12 +1,26 @@
 #define _XOPEN_SOURCE 600
 
-#include <sys/types.h>
 #include <linux/netlink.h>
+#include <inttypes.h>
 #include <netdb.h>
+#include <stdio.h>
+#include <sys/types.h>
 
 #include <netlink/msg.h>
 #include <netlink/netlink.h>
 #include <netlink/socket.h>
+
+#define print(x) fputs((x), stdout)
+
+
+void print_hardware_address(uint8_t* addr)
+{
+    for (int i = 0; i <= 5; ++i) {
+        printf("%02"PRIX8, addr[i]);
+        if (i != 5)
+            putchar(':');
+    }
+}
 
 
 int handle_msg(struct nl_msg* msg, void* arg)
@@ -27,22 +41,28 @@ int handle_msg(struct nl_msg* msg, void* arg)
                     puts("  unspecified");
                     break;
                 case IFLA_ADDRESS:
-                    puts("  interface L2 address");
+                    print("  interface L2 address: ");
+                    print_hardware_address(nla_data(ahdr));
+                    putchar('\n');
                     break;
                 case IFLA_BROADCAST:
-                    puts("  L2 broadcast address");
+                    print("  L2 broadcast address: ");
+                    print_hardware_address(nla_data(ahdr));
+                    putchar('\n');
                     break;
                 case IFLA_IFNAME:
-                    puts("  device name");
+                    printf("  device name: \"%s\"\n",
+                        (const char*)nla_data(ahdr));
                     break;
                 case IFLA_MTU:
-                    puts("  MTU");
+                    printf("  MTU: %u\n", *(unsigned int*)nla_data(ahdr));
                     break;
                 case IFLA_LINK:
-                    puts("  link type");
+                    printf("  link type: %d\n", *(int*)nla_data(ahdr));
                     break;
                 case IFLA_QDISC:
-                    puts("  queueing discipline");
+                    printf("  queueing discipline: \"%s\"\n",
+                        (const char*)nla_data(ahdr));
                     break;
                 case IFLA_STATS:
                     puts("  interface statistics");
