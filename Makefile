@@ -23,7 +23,7 @@ $(OBJ): $$(patsubst %.o,%.c,$$@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(EXE) $(EXTRA_EXE):
-	$(CC) $(LDFLAGS) -o $@ $^
+	$(CC) -o $@ $^ $(LDFLAGS)
 
 $(EXE): $$@.o
 
