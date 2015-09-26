@@ -12,8 +12,45 @@
 int handle_msg(struct nl_msg* msg, void* arg)
 {
     (void)arg;
-    struct nlmsghdr* hdr = nlmsg_hdr(msg);
-    printf("%p\n", hdr);
+
+    struct nlmsghdr* mhdr = nlmsg_hdr(msg);
+    struct ifinfomsg* mdata = nlmsg_data(mhdr);
+    printf("%u:\n", mdata->ifi_index);
+
+    {
+        struct nlattr* ahdr = nlmsg_attrdata(mhdr, sizeof(*mdata));
+        int arem = nlmsg_attrlen(mhdr, sizeof(*mdata));
+
+        for (/* */; nla_ok(ahdr, arem); ahdr = nla_next(ahdr, &arem)) {
+            switch (nla_type(ahdr)) {
+                case IFLA_UNSPEC:
+                    puts("  unspecified");
+                    break;
+                case IFLA_ADDRESS:
+                    puts("  interface L2 address");
+                    break;
+                case IFLA_BROADCAST:
+                    puts("  L2 broadcast address");
+                    break;
+                case IFLA_IFNAME:
+                    puts("  device name");
+                    break;
+                case IFLA_MTU:
+                    puts("  MTU");
+                    break;
+                case IFLA_LINK:
+                    puts("  link type");
+                    break;
+                case IFLA_QDISC:
+                    puts("  queueing discipline");
+                    break;
+                case IFLA_STATS:
+                    puts("  interface statistics");
+                    break;
+            }
+        }
+    }
+
     return NL_OK;
 }
 
