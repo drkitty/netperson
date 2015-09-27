@@ -1,8 +1,12 @@
 #define _XOPEN_SOURCE 600
 
-#include <linux/netlink.h>
+#include "fail.h"
+
+#include <asm/types.h>
 #include <inttypes.h>
+#include <linux/netlink.h>
 #include <netdb.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <sys/types.h>
 
@@ -10,7 +14,12 @@
 #include <netlink/netlink.h>
 #include <netlink/socket.h>
 
-#define print(x) fputs((x), stdout)
+#define SPACE_WITH_IFI NLMSG_SPACE(sizeof(struct ifinfomsg))
+
+
+const char* progname;
+
+const int verbosity = 2;
 
 
 void print_hardware_address(uint8_t* addr)
@@ -23,75 +32,125 @@ void print_hardware_address(uint8_t* addr)
 }
 
 
-int handle_msg(struct nl_msg* msg, void* arg)
+int main(int argc, char** argv)
 {
-    (void)arg;
+    (void)argc;
+    progname = argv[0];
 
-    struct nlmsghdr* mhdr = nlmsg_hdr(msg);
-    struct ifinfomsg* mdata = nlmsg_data(mhdr);
-    printf("%u:\n", mdata->ifi_index);
+    int sock = socket(AF_NETLINK, SOCK_DGRAM, NETLINK_ROUTE);
+    if (sock == -1)
+        fatal_e(1, "Can't create socket");
 
     {
-        struct nlattr* ahdr = nlmsg_attrdata(mhdr, sizeof(*mdata));
-        int arem = nlmsg_attrlen(mhdr, sizeof(*mdata));
+        struct sockaddr_nl addr = {
+            .nl_family = AF_NETLINK,
+            .nl_pad = 0,
+            .nl_pid = 0, // kernel
+            .nl_groups = 0,
+        };
+        if (-1 == connect(sock, (const struct sockaddr*)&addr, sizeof(addr)))
+            fatal_e(1, "Can't connect to kernel");
+    }
 
-        for (/* */; nla_ok(ahdr, arem); ahdr = nla_next(ahdr, &arem)) {
-            switch (nla_type(ahdr)) {
-                case IFLA_UNSPEC:
-                    puts("  unspecified");
-                    break;
-                case IFLA_ADDRESS:
-                    print("  interface L2 address: ");
-                    print_hardware_address(nla_data(ahdr));
-                    putchar('\n');
-                    break;
-                case IFLA_BROADCAST:
-                    print("  L2 broadcast address: ");
-                    print_hardware_address(nla_data(ahdr));
-                    putchar('\n');
-                    break;
-                case IFLA_IFNAME:
-                    printf("  device name: \"%s\"\n",
-                        (const char*)nla_data(ahdr));
-                    break;
-                case IFLA_MTU:
-                    printf("  MTU: %u\n", *(unsigned int*)nla_data(ahdr));
-                    break;
-                case IFLA_LINK:
-                    printf("  link type: %d\n", *(int*)nla_data(ahdr));
-                    break;
-                case IFLA_QDISC:
-                    printf("  queueing discipline: \"%s\"\n",
-                        (const char*)nla_data(ahdr));
-                    break;
-                case IFLA_STATS:
-                    puts("  interface statistics");
-                    break;
+    {
+        ssize_t msg_size = (ssize_t)NLMSG_SPACE(sizeof(struct ifinfomsg));
+        struct nlmsghdr* mhdr = malloc(msg_size);
+        struct ifinfomsg* mdata = NLMSG_DATA(mhdr);
+        /*
+         *printf(
+         *    "NLMSG_LENGTH(...) = %d, NLMSG_SPACE(...) = %d, "
+         *    "NLMSG_ALIGN(NLMSG_LENGTH(...)) = %d\n",
+         *    NLMSG_LENGTH(9),
+         *    NLMSG_SPACE(9),
+         *    NLMSG_ALIGN(NLMSG_LENGTH(9)));
+         */
+        *mhdr = (struct nlmsghdr){
+            .nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg)),
+            .nlmsg_type = RTM_GETLINK,
+            .nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP,
+            .nlmsg_seq = 0,
+            .nlmsg_pid = 0,
+        };
+        *mdata = (struct ifinfomsg){
+            .ifi_family = AF_UNSPEC,
+            .ifi_type = 300,
+            .ifi_index = 129,
+            .ifi_flags = 33,
+            .ifi_change = 1,
+        };
+
+        if (!NLMSG_OK(mhdr, mhdr->nlmsg_len))
+            fatal(1, "Invalid message generated");
+
+        ssize_t count = send(sock, mhdr, mhdr->nlmsg_len, 0);
+        if (count == -1)
+            fatal_e(1, "Couldn't send message to kernel");
+        v2("Sent %zd bytes of data", count);
+
+        while (true) {
+            count = recv(sock, mhdr, 0, MSG_PEEK | MSG_TRUNC);
+            if (count == -1) {
+                fatal_e(1, "Couldn't peek at message size");
+            } else if (count >= msg_size) {
+                v2("Resizing msg buffer to %zd", count);
+                msg_size = count;
+                mhdr = realloc(mhdr, msg_size);
+            }
+
+            count = recv(sock, mhdr, count, 0);
+            if (count == -1)
+                fatal_e(1, "Couldn't receive message from kernel");
+            else if (count == 0)
+                fatal(1, "Kernel socket shut down");
+
+            if (mhdr->nlmsg_type == NLMSG_DONE)
+                break;
+
+            struct rtattr* ahdr =
+                (struct rtattr*)((char*)mhdr + SPACE_WITH_IFI);
+            unsigned int arem = count - SPACE_WITH_IFI;
+            printf("arem = %u\n", arem);
+
+            for (/* */; RTA_OK(ahdr, arem); ahdr = RTA_NEXT(ahdr, arem)) {
+                printf("%u:\n", mdata->ifi_index);
+
+                switch (ahdr->rta_type) {
+                    case IFLA_UNSPEC:
+                        puts("  unspecified");
+                        break;
+                    case IFLA_ADDRESS:
+                        print("  interface L2 address: ");
+                        print_hardware_address(RTA_DATA(ahdr));
+                        putchar('\n');
+                        break;
+                    case IFLA_BROADCAST:
+                        print("  L2 broadcast address: ");
+                        print_hardware_address(RTA_DATA(ahdr));
+                        putchar('\n');
+                        break;
+                    case IFLA_IFNAME:
+                        printf("  device name: \"%s\"\n",
+                            (const char*)RTA_DATA(ahdr));
+                        break;
+                    case IFLA_MTU:
+                        printf("  MTU: %u\n", *(unsigned int*)RTA_DATA(ahdr));
+                        break;
+                    case IFLA_LINK:
+                        printf("  link type: %d\n", *(int*)RTA_DATA(ahdr));
+                        break;
+                    case IFLA_QDISC:
+                        printf("  queueing discipline: \"%s\"\n",
+                            (const char*)RTA_DATA(ahdr));
+                        break;
+                    case IFLA_STATS:
+                        puts("  interface statistics");
+                        break;
+                }
             }
         }
+
+        free(mhdr);
     }
 
-    return NL_OK;
-}
-
-
-int main()
-{
-    struct nl_sock* sock = nl_socket_alloc();
-    nl_connect(sock, NETLINK_ROUTE);
-    {
-        struct nl_cb* cb = nl_cb_alloc(NL_CB_VERBOSE);
-        nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, handle_msg, NULL);
-        nl_socket_set_cb(sock, cb);
-    }
-
-    struct ifinfomsg ifi = {
-        .ifi_family = AF_UNSPEC,
-        .ifi_change = 0xFFFFFFFF,
-    };
-
-    nl_send_simple(sock, RTM_GETLINK, NLM_F_DUMP, &ifi, sizeof(ifi));
-    nl_recvmsgs_default(sock);
-    nl_socket_free(sock);
     return 0;
 }

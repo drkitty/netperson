@@ -5,7 +5,7 @@ MAKEFLAGS += --no-builtin-rules
 
 
 EXE_SRC := nw.c
-SRC := $(EXE_SRC)
+SRC := $(EXE_SRC) fail.c
 
 OBJ := $(SRC:%.c=%.o)
 EXE := $(EXE_SRC:%.c=%)
@@ -31,7 +31,9 @@ clean:
 	rm -f $(OBJ) $(EXE)
 
 
-#nw:
+fail.o: fail.h
+
+nw: fail.o
 
 
 .DEFAULT_GOAL := all
