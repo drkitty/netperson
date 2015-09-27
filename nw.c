@@ -130,7 +130,8 @@ int main(int argc, char** argv)
 
     {
         ssize_t msg_size = (ssize_t)NLMSG_SPACE(sizeof(struct ifinfomsg));
-        struct nlmsghdr* mhdr = malloc(msg_size);
+        void* msg_start = malloc(msg_size);
+        struct nlmsghdr* mhdr = msg_start;
         void* mdata = NLMSG_DATA(mhdr);
         struct ifinfomsg* mifi = mdata;
         /*
@@ -169,39 +170,28 @@ int main(int argc, char** argv)
             fatal_e(1, "Couldn't send message to kernel");
         v2("Sent %zd bytes of data", count);
 
-        while (true) {
-            count = recv(sock, mhdr, 0, MSG_PEEK | MSG_TRUNC);
-            if (count == -1) {
-                fatal_e(1, "Couldn't peek at message size");
-            } else if (count >= msg_size) {
-                v2("Resizing msg buffer to %zd", count);
-                msg_size = count;
-                mhdr = realloc(mhdr, msg_size);
-            }
+        count = recv(sock, mhdr, 0, MSG_PEEK | MSG_TRUNC);
+        if (count == -1) {
+            fatal_e(1, "Couldn't peek at message size");
+        } else if (count >= msg_size) {
+            v2("Resizing msg buffer to %zd", count);
+            msg_size = count;
+            mhdr = realloc(mhdr, msg_size);
+        }
 
-            count = recv(sock, mhdr, count, 0);
-            if (count == -1)
-                fatal_e(1, "Couldn't receive message from kernel");
-            else if (count == 0)
-                fatal(1, "Kernel socket shut down");
+        count = recv(sock, mhdr, count, 0);
+        if (count == -1)
+            fatal_e(1, "Couldn't receive message from kernel");
+        else if (count == 0)
+            fatal(1, "Kernel socket shut down");
 
-            print_nlmsghdr(mhdr);
-            putchar('\n');
+        print_nlmsghdr(mhdr);
+        putchar('\n');
 
-            if (mhdr->nlmsg_type == NLMSG_DONE) {
-                break;
-                /*
-                 *mhdr->nlmsg_type = NLMSG_ERROR;
-                 *mhdr->nlmsg_len = NLMSG_LENGTH(sizeof(struct nlmsgerr));
-                 *((struct nlmsgerr*)mdata)->error = 0;
-                 *ssize_t count = send(sock, mhdr, mhdr->nlmsg_len, 0);
-                 *if (count == -1)
-                 *    fatal_e(1, "Couldn't send ACK to kernel");
-                 *v2("ACKed with %zd bytes of data", count);
-                 */
+        int mrem = count;
 
-            }
-
+        for (/* */; mhdr->nlmsg_type != NLMSG_DONE && NLMSG_OK(mhdr, mrem);
+            mhdr = NLMSG_NEXT(mhdr, mrem)) {
             struct rtattr* ahdr =
                 (struct rtattr*)((char*)mhdr + SPACE_WITH_IFI);
             unsigned int arem = mhdr->nlmsg_len - SPACE_WITH_IFI;
@@ -247,7 +237,7 @@ int main(int argc, char** argv)
             }
         }
 
-        free(mhdr);
+        free(msg_start);
     }
 
     return 0;
