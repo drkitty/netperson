@@ -80,6 +80,10 @@ void print_nlmsghdr(struct nlmsghdr* mhdr)
         print(" ATOMIC");
         flags = true;
     }
+    if (mhdr->nlmsg_flags & NLM_F_DUMP) {
+        print(" DUMP");
+        flags = true;
+    }
     if (mhdr->nlmsg_flags & NLM_F_REPLACE) {
         print(" REPLACE");
         flags = true;
@@ -127,7 +131,8 @@ int main(int argc, char** argv)
     {
         ssize_t msg_size = (ssize_t)NLMSG_SPACE(sizeof(struct ifinfomsg));
         struct nlmsghdr* mhdr = malloc(msg_size);
-        struct ifinfomsg* mdata = NLMSG_DATA(mhdr);
+        void* mdata = NLMSG_DATA(mhdr);
+        struct ifinfomsg* mifi = mdata;
         /*
          *printf(
          *    "NLMSG_LENGTH(...) = %d, NLMSG_SPACE(...) = %d, "
@@ -139,11 +144,11 @@ int main(int argc, char** argv)
         *mhdr = (struct nlmsghdr){
             .nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg)),
             .nlmsg_type = RTM_GETLINK,
-            .nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP,
+            .nlmsg_flags = NLM_F_REQUEST | NLM_F_ROOT,
             .nlmsg_seq = 0,
             .nlmsg_pid = 0,
         };
-        *mdata = (struct ifinfomsg){
+        *mifi = (struct ifinfomsg){
             .ifi_family = AF_UNSPEC,
             .ifi_type = 300,
             .ifi_index = 129,
@@ -154,6 +159,11 @@ int main(int argc, char** argv)
         if (!NLMSG_OK(mhdr, mhdr->nlmsg_len))
             fatal(1, "Invalid message generated");
 
+        if (verbosity >= 2) {
+            print("Sending {");
+            print_nlmsghdr(mhdr);
+            print("}\n");
+        }
         ssize_t count = send(sock, mhdr, mhdr->nlmsg_len, 0);
         if (count == -1)
             fatal_e(1, "Couldn't send message to kernel");
@@ -178,14 +188,25 @@ int main(int argc, char** argv)
             print_nlmsghdr(mhdr);
             putchar('\n');
 
-            if (mhdr->nlmsg_type == NLMSG_DONE)
+            if (mhdr->nlmsg_type == NLMSG_DONE) {
                 break;
+                /*
+                 *mhdr->nlmsg_type = NLMSG_ERROR;
+                 *mhdr->nlmsg_len = NLMSG_LENGTH(sizeof(struct nlmsgerr));
+                 *((struct nlmsgerr*)mdata)->error = 0;
+                 *ssize_t count = send(sock, mhdr, mhdr->nlmsg_len, 0);
+                 *if (count == -1)
+                 *    fatal_e(1, "Couldn't send ACK to kernel");
+                 *v2("ACKed with %zd bytes of data", count);
+                 */
+
+            }
 
             struct rtattr* ahdr =
                 (struct rtattr*)((char*)mhdr + SPACE_WITH_IFI);
-            unsigned int arem = count - SPACE_WITH_IFI;
+            unsigned int arem = mhdr->nlmsg_len - SPACE_WITH_IFI;
             printf("arem = %u\n", arem);
-            printf("%u:\n", mdata->ifi_index);
+            printf("%u:\n", mifi->ifi_index);
 
             for (/* */; RTA_OK(ahdr, arem); ahdr = RTA_NEXT(ahdr, arem)) {
 
