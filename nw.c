@@ -4,15 +4,14 @@
 
 #include <asm/types.h>
 #include <inttypes.h>
+#include <linux/if_link.h>
 #include <linux/netlink.h>
+#include <linux/rtnetlink.h>
 #include <netdb.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <sys/socket.h>
 #include <sys/types.h>
-
-#include <netlink/msg.h>
-#include <netlink/netlink.h>
-#include <netlink/socket.h>
 
 #define SPACE_WITH_IFI NLMSG_SPACE(sizeof(struct ifinfomsg))
 
@@ -178,13 +177,13 @@ int main(int argc, char** argv)
         else if (count == 0)
             fatal(1, "Kernel socket shut down");
 
-        print_nlmsghdr(mhdr);
-        putchar('\n');
-
         int mrem = count;
 
         for (/* */; mhdr->nlmsg_type != NLMSG_DONE && NLMSG_OK(mhdr, mrem);
                 mhdr = NLMSG_NEXT(mhdr, mrem)) {
+            print_nlmsghdr(mhdr);
+            putchar('\n');
+
             mifi = NLMSG_DATA(mhdr);
             struct rtattr* ahdr =
                 (struct rtattr*)((char*)mhdr + SPACE_WITH_IFI);
@@ -231,6 +230,9 @@ int main(int argc, char** argv)
                 }
             }
         }
+
+        print_nlmsghdr(mhdr);
+        putchar('\n');
 
         free(msg_start);
     }

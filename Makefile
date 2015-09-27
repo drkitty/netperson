@@ -14,7 +14,7 @@ CC := gcc
 CFLAGS := -std=c99 -g -Wall -Wextra -Werror -Wno-unused-function \
 	-I /usr/include/libnl3
 
-LDFLAGS := -lnl-genl-3 -lnl-3
+LDFLAGS :=
 
 
 all: $(EXE) $(EXTRA_EXE)
