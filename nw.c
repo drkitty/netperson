@@ -32,6 +32,78 @@ void print_hardware_address(uint8_t* addr)
 }
 
 
+void print_nlmsghdr(struct nlmsghdr* mhdr)
+{
+    printf("len = %"PRIu32", type = ", mhdr->nlmsg_len);
+    switch (mhdr->nlmsg_type) {
+        case NLMSG_NOOP:
+            print("NOOP");
+            break;
+        case NLMSG_ERROR:
+            print("ERROR");
+            break;
+        case NLMSG_DONE:
+            print("DONE");
+            break;
+        default:
+            print("unknown");
+            break;
+    }
+
+    print(", flags =");
+    bool flags = false;
+    if (mhdr->nlmsg_flags & NLM_F_REQUEST) {
+        print(" REQUEST");
+        flags = true;
+    }
+    if (mhdr->nlmsg_flags & NLM_F_MULTI) {
+        print(" MULTI");
+        flags = true;
+    }
+    if (mhdr->nlmsg_flags & NLM_F_ACK) {
+        print(" ACK");
+        flags = true;
+    }
+    if (mhdr->nlmsg_flags & NLM_F_ECHO) {
+        print(" ECHO");
+        flags = true;
+    }
+    if (mhdr->nlmsg_flags & NLM_F_ROOT) {
+        print(" ROOT");
+        flags = true;
+    }
+    if (mhdr->nlmsg_flags & NLM_F_MATCH) {
+        print(" MATCH");
+        flags = true;
+    }
+    if (mhdr->nlmsg_flags & NLM_F_ATOMIC) {
+        print(" ATOMIC");
+        flags = true;
+    }
+    if (mhdr->nlmsg_flags & NLM_F_REPLACE) {
+        print(" REPLACE");
+        flags = true;
+    }
+    if (mhdr->nlmsg_flags & NLM_F_EXCL) {
+        print(" EXCL");
+        flags = true;
+    }
+    if (mhdr->nlmsg_flags & NLM_F_CREATE) {
+        print(" CREATE");
+        flags = true;
+    }
+    if (mhdr->nlmsg_flags & NLM_F_APPEND) {
+        print(" APPEND");
+        flags = true;
+    }
+    if (!flags)
+        print(" (none)");
+
+    printf(", seq = %"PRIu32", pid = %"PRIu32,
+        mhdr->nlmsg_seq, mhdr->nlmsg_pid);
+}
+
+
 int main(int argc, char** argv)
 {
     (void)argc;
@@ -103,6 +175,9 @@ int main(int argc, char** argv)
             else if (count == 0)
                 fatal(1, "Kernel socket shut down");
 
+            print_nlmsghdr(mhdr);
+            putchar('\n');
+
             if (mhdr->nlmsg_type == NLMSG_DONE)
                 break;
 
@@ -110,9 +185,9 @@ int main(int argc, char** argv)
                 (struct rtattr*)((char*)mhdr + SPACE_WITH_IFI);
             unsigned int arem = count - SPACE_WITH_IFI;
             printf("arem = %u\n", arem);
+            printf("%u:\n", mdata->ifi_index);
 
             for (/* */; RTA_OK(ahdr, arem); ahdr = RTA_NEXT(ahdr, arem)) {
-                printf("%u:\n", mdata->ifi_index);
 
                 switch (ahdr->rta_type) {
                     case IFLA_UNSPEC:
