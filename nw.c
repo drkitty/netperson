@@ -149,13 +149,6 @@ int main(int argc, char** argv)
             .nlmsg_seq = 0,
             .nlmsg_pid = 0,
         };
-        *mifi = (struct ifinfomsg){
-            .ifi_family = AF_UNSPEC,
-            .ifi_type = 300,
-            .ifi_index = 129,
-            .ifi_flags = 33,
-            .ifi_change = 1,
-        };
 
         if (!NLMSG_OK(mhdr, mhdr->nlmsg_len))
             fatal(1, "Invalid message generated");
@@ -191,7 +184,8 @@ int main(int argc, char** argv)
         int mrem = count;
 
         for (/* */; mhdr->nlmsg_type != NLMSG_DONE && NLMSG_OK(mhdr, mrem);
-            mhdr = NLMSG_NEXT(mhdr, mrem)) {
+                mhdr = NLMSG_NEXT(mhdr, mrem)) {
+            mifi = NLMSG_DATA(mhdr);
             struct rtattr* ahdr =
                 (struct rtattr*)((char*)mhdr + SPACE_WITH_IFI);
             unsigned int arem = mhdr->nlmsg_len - SPACE_WITH_IFI;
@@ -233,6 +227,7 @@ int main(int argc, char** argv)
                         break;
                     default:
                         printf("  unknown (%hu)\n", ahdr->rta_type);
+                        break;
                 }
             }
         }
