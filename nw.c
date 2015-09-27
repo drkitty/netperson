@@ -191,7 +191,7 @@ int main(int argc, char** argv)
 
                 switch (ahdr->rta_type) {
                     case IFLA_UNSPEC:
-                        puts("  unspecified");
+                        printf("  unspecified (%hu)\n", ahdr->rta_type);
                         break;
                     case IFLA_ADDRESS:
                         print("  interface L2 address: ");
@@ -220,6 +220,8 @@ int main(int argc, char** argv)
                     case IFLA_STATS:
                         puts("  interface statistics");
                         break;
+                    default:
+                        printf("  unknown (%hu)\n", ahdr->rta_type);
                 }
             }
         }
