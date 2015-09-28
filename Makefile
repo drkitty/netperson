@@ -4,7 +4,7 @@ MAKEFLAGS += --no-builtin-rules
 .SECONDEXPANSION:
 
 
-EXE_SRC := nw.c
+EXE_SRC := np.c
 SRC := $(EXE_SRC) fail.c
 
 OBJ := $(SRC:%.c=%.o)
@@ -33,7 +33,7 @@ clean:
 
 fail.o: fail.h
 
-nw: fail.o
+np: fail.o
 
 
 .DEFAULT_GOAL := all
