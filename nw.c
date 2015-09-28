@@ -13,6 +13,8 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
+#include <linux/if.h>
+
 #define SPACE_WITH_IFI NLMSG_SPACE(sizeof(struct ifinfomsg))
 
 
@@ -45,7 +47,7 @@ void print_nlmsghdr(struct nlmsghdr* mhdr)
             print("DONE");
             break;
         default:
-            print("unknown");
+            print("???");
             break;
     }
 
@@ -192,40 +194,123 @@ int main(int argc, char** argv)
             printf("%u:\n", mifi->ifi_index);
 
             for (/* */; RTA_OK(ahdr, arem); ahdr = RTA_NEXT(ahdr, arem)) {
+                void* adata = RTA_DATA(ahdr);
 
                 switch (ahdr->rta_type) {
                     case IFLA_UNSPEC:
                         printf("  unspecified (%hu)\n", ahdr->rta_type);
                         break;
+                    case IFLA_IFNAME:
+                        printf("  device name: \"%s\"\n", (char*)adata);
+                        break;
                     case IFLA_ADDRESS:
                         print("  interface L2 address: ");
-                        print_hardware_address(RTA_DATA(ahdr));
+                        print_hardware_address(adata);
                         putchar('\n');
                         break;
                     case IFLA_BROADCAST:
                         print("  L2 broadcast address: ");
-                        print_hardware_address(RTA_DATA(ahdr));
+                        print_hardware_address(adata);
                         putchar('\n');
                         break;
-                    case IFLA_IFNAME:
-                        printf("  device name: \"%s\"\n",
-                            (const char*)RTA_DATA(ahdr));
+                    case IFLA_MAP:
+                        print("  map (?)\n");
                         break;
                     case IFLA_MTU:
-                        printf("  MTU: %u\n", *(unsigned int*)RTA_DATA(ahdr));
+                        printf("  MTU: %u\n", *(unsigned int*)adata);
                         break;
                     case IFLA_LINK:
-                        printf("  link type: %d\n", *(int*)RTA_DATA(ahdr));
+                        printf("  link type: %u\n", *(unsigned int*)adata);
+                        break;
+                    case IFLA_MASTER:
+                        printf("  master (?): %u\n",
+                            *(unsigned int*)adata);
+                        break;
+                    case IFLA_CARRIER:
+                        printf("  carrier (?): %hhu\n",
+                            *(unsigned char*)adata);
+                        break;
+                    case IFLA_TXQLEN:
+                        printf("  TXQLEN (?): %u\n", *(unsigned int*)adata);
+                        break;
+                    case IFLA_WEIGHT:
+                        printf("  weight: %hhu\n", *(unsigned int*)adata);
+                        break;
+                    case IFLA_OPERSTATE:
+                        print("  operational state: ");
+                        switch (*(unsigned int*)adata) {
+                            case IF_OPER_UNKNOWN:
+                                print("unknown"); break;
+                            case IF_OPER_NOTPRESENT:
+                                print("not present"); break;
+                            case IF_OPER_DOWN:
+                                print("down"); break;
+                            case IF_OPER_LOWERLAYERDOWN:
+                                print("lower layer down"); break;
+                            case IF_OPER_TESTING:
+                                print("testing"); break;
+                            case IF_OPER_DORMANT:
+                                print("dormant"); break;
+                            case IF_OPER_UP:
+                                print("up"); break;
+                            default:
+                                print("???"); break;
+                        }
+                        putchar('\n');
+                        break;
+                    case IFLA_LINKMODE:
+                        printf("  mode: %hhu\n", *(unsigned char*)adata);
+                        break;
+                    case IFLA_LINKINFO:
+                        print("  link info (?)\n");
+                        break;
+                    case IFLA_NET_NS_PID:
+                        print("  NET_NS_PID (?)\n");
+                        break;
+                    case IFLA_NET_NS_FD:
+                        print("  NET_NS_FD (?)\n");
+                        break;
+                    case IFLA_IFALIAS:
+                        printf("  alias: \"%s\"\n", (char*)adata);
+                        break;
+                    case IFLA_VFINFO_LIST:
+                        print("  VFINFO_LIST (?)\n");
+                        break;
+                    case IFLA_VF_PORTS:
+                        print("  VF_PORTS (?)\n");
+                        break;
+                    case IFLA_PORT_SELF:
+                        print("  PORT_SELF (?)\n");
+                        break;
+                    case IFLA_AF_SPEC:
+                        print("  AF_SPEC\n");
+                        break;
+                    case IFLA_EXT_MASK:
+                        printf("  EXT_MASK (?): %u\n", *(unsigned int*)adata);
+                        break;
+                    case IFLA_PROMISCUITY:
+                        printf("  promiscuity: %u\n", *(unsigned int*)adata);
+                        break;
+                    case IFLA_NUM_TX_QUEUES:
+                        printf("  NUM_TX_QUEUES (?): %u\n",
+                            *(unsigned int*)adata);
+                        break;
+                    case IFLA_NUM_RX_QUEUES:
+                        printf("  NUM_RX_QUEUES (?): %u\n",
+                            *(unsigned int*)adata);
+                        break;
+                    case IFLA_PHYS_PORT_ID:
+                        print("  PHYS_PORT_ID (?)\n");
                         break;
                     case IFLA_QDISC:
                         printf("  queueing discipline: \"%s\"\n",
-                            (const char*)RTA_DATA(ahdr));
+                            (const char*)adata);
                         break;
                     case IFLA_STATS:
                         puts("  interface statistics");
                         break;
                     default:
-                        printf("  unknown (%hu)\n", ahdr->rta_type);
+                        printf("  ??? (%hu)\n", ahdr->rta_type);
                         break;
                 }
             }
