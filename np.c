@@ -153,7 +153,7 @@ int main(int argc, char** argv)
             fatal(1, "Invalid message generated");
 
         if (verbosity >= 2) {
-            print("Sending {");
+            print("TX {");
             print_nlmsghdr(mhdr);
             print("}\n");
         }
@@ -181,8 +181,9 @@ int main(int argc, char** argv)
 
         for (/* */; mhdr->nlmsg_type != NLMSG_DONE && NLMSG_OK(mhdr, mrem);
                 mhdr = NLMSG_NEXT(mhdr, mrem)) {
+            print("RX {");
             print_nlmsghdr(mhdr);
-            putchar('\n');
+            print("}\n");
 
             mifi = NLMSG_DATA(mhdr);
             struct rtattr* ahdr =
