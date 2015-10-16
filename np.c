@@ -18,8 +18,6 @@
 #define SPACE_WITH_IFI NLMSG_SPACE(sizeof(struct ifinfomsg))
 
 
-const char* progname;
-
 const int verbosity = 2;
 
 
@@ -112,7 +110,7 @@ void print_nlmsghdr(struct nlmsghdr* mhdr)
 int main(int argc, char** argv)
 {
     (void)argc;
-    progname = argv[0];
+    (void)argv;
 
     int sock = socket(AF_NETLINK, SOCK_DGRAM, NETLINK_ROUTE);
     if (sock == -1)
